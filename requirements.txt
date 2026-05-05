@@ -2,6 +2,7 @@ requests==2.32.3
 minio==7.2.9
 python-dotenv==1.0.1
 pyspark==3.5.1
+apache-airflow==2.10.5
 dbt-core==1.7.9
 dbt-postgres==1.7.9
 psycopg2-binary==2.9.9
