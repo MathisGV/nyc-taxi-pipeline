@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Airflow
+logs/
+plugins/
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+
+# Docker
+postgres_data/
+minio_data/
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets
+*.env
+config.ini
