@@ -3,6 +3,7 @@ from scripts.ingestion.weather.openweather_client import (
     OpenWeatherClientError,
     fetch_current_weather,
 )
+from scripts.ingestion.weather.snapshot_writer import persist_weather_snapshot
 
 
 def main() -> None:
@@ -13,6 +14,8 @@ def main() -> None:
     except OpenWeatherClientError as exc:
         raise SystemExit(f"Failed to fetch weather data: {exc}") from exc
 
+    output_path = persist_weather_snapshot(payload, config)
+
     weather_main = "unknown"
     weather_list = payload.get("weather")
     if isinstance(weather_list, list) and weather_list:
@@ -21,8 +24,9 @@ def main() -> None:
             weather_main = str(first_weather.get("main", "unknown"))
 
     print(
-        "weather payload fetched "
-        f"(city={config.openweather_city}, condition={weather_main})"
+        "weather payload fetched and saved "
+        f"(city={config.openweather_city}, condition={weather_main}, "
+        f"path={output_path})"
     )
 
 
