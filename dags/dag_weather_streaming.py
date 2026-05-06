@@ -1,39 +1,40 @@
 from datetime import datetime, timedelta
+
 from airflow import DAG
-from airflow.providers.standard.operators.bash import BashOperator
+from airflow.operators.bash import BashOperator
 
 default_args = {
     "owner": "airflow",
-    "retries": 3,
+    "retries": 2,
     "retry_delay": timedelta(minutes=2),
     "email_on_failure": False,
 }
 
 with DAG(
     dag_id="dag_weather_streaming",
-    description="Ingestion et traitement streaming des données météo NYC",
+    description="Orchestrate weather ingestion and streaming transform",
     default_args=default_args,
     start_date=datetime(2025, 1, 1),
-    schedule_interval="0 * * * *",
+    schedule="0 * * * *",
     catchup=False,
     max_active_runs=1,
-    tags=["weather", "streaming", "ingestion"],
+    tags=["weather", "streaming"],
 ) as dag:
-
-    ingest = BashOperator(
-        task_id="ingest_weather",
+    ingest_weather = BashOperator(
+        task_id="ingest_weather_snapshot",
         bash_command=(
-            "python /opt/airflow/scripts/ingestion/ingest_weather.py --once"
+            "PYTHONPATH=/opt/airflow "
+            "python -m scripts.ingestion.weather.fetch_weather --once"
         ),
     )
 
-    transform = BashOperator(
-        task_id="transform_weather",
+    stream_weather = BashOperator(
+        task_id="run_weather_streaming_job",
         bash_command=(
-            "spark-submit "
-            "--master spark://spark-master:7077 "
-            "/opt/airflow/scripts/processing/transform_weather.py "
-            "--date {{ execution_date.strftime('%Y-%m-%d') }} "
-            "--hour {{ execution_date.hour }}"
+            "PYTHONPATH=/opt/airflow "
+            "python -m scripts.processing.weather_streaming.stream_weather "
+            "--trigger-once"
         ),
     )
+
+    ingest_weather >> stream_weather
