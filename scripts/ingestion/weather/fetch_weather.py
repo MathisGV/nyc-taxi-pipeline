@@ -1,4 +1,5 @@
 import argparse
+import logging
 import time
 
 from scripts.ingestion.weather.config import load_weather_config, validate_weather_config
@@ -7,6 +8,8 @@ from scripts.ingestion.weather.openweather_client import (
     fetch_current_weather,
 )
 from scripts.ingestion.weather.snapshot_writer import persist_weather_snapshot
+
+LOGGER = logging.getLogger(__name__)
 
 
 def run_once() -> None:
@@ -31,19 +34,31 @@ def run_once() -> None:
         f"(city={config.openweather_city}, condition={weather_main}, "
         f"path={output_path})"
     )
+    LOGGER.info(
+        "weather snapshot persisted city=%s condition=%s path=%s",
+        config.openweather_city,
+        weather_main,
+        output_path,
+    )
 
 
 def run_loop(interval_seconds: int, max_runs: int | None = None) -> None:
-    print(
-        "starting weather loop "
-        f"(interval_s={interval_seconds}, max_runs={max_runs})"
+    LOGGER.info(
+        "starting weather loop interval_seconds=%s max_runs=%s",
+        interval_seconds,
+        max_runs,
     )
     run_count = 0
     while True:
-        run_once()
+        try:
+            run_once()
+        except Exception as exc:
+            LOGGER.exception("run_once failed: %s", exc)
+            if max_runs is not None:
+                raise
         run_count += 1
         if max_runs is not None and run_count >= max_runs:
-            print(f"weather loop finished after {run_count} runs")
+            LOGGER.info("weather loop finished runs=%s", run_count)
             return
         time.sleep(interval_seconds)
 
@@ -79,6 +94,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    )
     args = parse_args()
     config = load_weather_config()
     validate_weather_config(config)

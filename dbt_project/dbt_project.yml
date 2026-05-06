@@ -5,6 +5,9 @@ config-version: 2
 profile: 'nyc_taxi_pipeline'
 
 model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
 
 models:
   nyc_taxi_pipeline:
@@ -12,3 +15,4 @@ models:
       +materialized: view
     marts:
       +materialized: table
+    +materialized: table
