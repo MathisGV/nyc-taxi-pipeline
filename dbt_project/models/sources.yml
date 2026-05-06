@@ -2,33 +2,31 @@ version: 2
 
 sources:
   - name: raw
-    database: nyc_taxi
-    schema: public
+    database: airflow
+    schema: raw
     tables:
       - name: fact_taxi_trips
-        description: "Données des trajets Yellow Taxi NYC transformées par Spark"
+        description: "Donnees brutes des trajets Yellow Taxi NYC transformees par Spark"
         columns:
-          - name: pickup_datetime
+          - name: tpep_pickup_datetime
             description: "Heure de prise en charge"
+          - name: pickup_hour
+            description: "Heure de prise en charge (0-23)"
           - name: trip_duration_minutes
-            description: "Durée du trajet en minutes"
+            description: "Duree du trajet en minutes"
+          - name: distance_bucket
+            description: "Tranche de distance (0-2km, 2-5km, >5km)"
+          - name: payment_label
+            description: "Type de paiement (carte, especes, etc.)"
           - name: tip_percentage
-            description: "Pourcentage de pourboire"
-          - name: total_amount
-            description: "Montant total du trajet"
-          - name: passenger_count
-            description: "Nombre de passagers"
+            description: "Pourcentage de pourboire sur le montant de base"
 
       - name: dim_weather
-        description: "Relevés météo horaires NYC via OpenWeatherMap"
+        description: "Releves meteo horaires NYC via OpenWeatherMap"
         columns:
-          - name: weather_timestamp
-            description: "Horodatage du relevé météo"
-          - name: weather_category
-            description: "Catégorie météo"
+          - name: pickup_hour
+            description: "Heure du releve (0-23)"
           - name: temperature
-            description: "Température en °C"
-          - name: humidity
-            description: "Humidité"
-          - name: wind_speed
-            description: "Vitesse du vent"
+            description: "Temperature en degres Celsius"
+          - name: weather_category
+            description: "Categorie meteo (Clear, Rainy, Stormy)"

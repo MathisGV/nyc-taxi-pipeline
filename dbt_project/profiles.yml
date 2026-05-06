@@ -3,10 +3,10 @@ nyc_taxi_pipeline:
   outputs:
     dev:
       type: postgres
-      host: localhost
-      port: 5432
-      user: airflow
-      password: airflow
-      dbname: airflow
+      host: "{{ env_var('POSTGRES_HOST') }}"
+      port: "{{ env_var('PGPORT', '5432') | int }}"
+      user: "{{ env_var('POSTGRES_USER') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_DB') }}"
       schema: mart
       threads: 4
