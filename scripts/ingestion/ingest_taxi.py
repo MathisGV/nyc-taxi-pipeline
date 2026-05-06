@@ -7,7 +7,7 @@ import requests
 from minio.error import S3Error
 from dotenv import load_dotenv
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import get_minio_client, ensure_bucket, get_logger
 
 load_dotenv()
