@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from typing import Callable
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, dayofweek, from_unixtime, hour, lower, to_timestamp, when
@@ -122,7 +123,55 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Process available files once and stop.",
     )
+    parser.add_argument(
+        "--pg-host",
+        default=os.getenv("PGHOST", "localhost"),
+        help="PostgreSQL host.",
+    )
+    parser.add_argument(
+        "--pg-port",
+        type=int,
+        default=int(os.getenv("PGPORT", "5432")),
+        help="PostgreSQL port.",
+    )
+    parser.add_argument(
+        "--pg-db",
+        default=os.getenv("POSTGRES_DB", "postgres"),
+        help="PostgreSQL database name.",
+    )
+    parser.add_argument(
+        "--pg-user",
+        default=os.getenv("POSTGRES_USER", "postgres"),
+        help="PostgreSQL username.",
+    )
+    parser.add_argument(
+        "--pg-password",
+        default=os.getenv("POSTGRES_PASSWORD", ""),
+        help="PostgreSQL password.",
+    )
+    parser.add_argument(
+        "--pg-table",
+        default=os.getenv("WEATHER_PG_TABLE", "dim_weather"),
+        help="Target PostgreSQL table for weather data.",
+    )
     return parser.parse_args()
+
+
+def build_postgres_batch_writer(
+    jdbc_url: str, pg_table: str, pg_user: str, pg_password: str
+) -> Callable[[DataFrame, int], None]:
+    def _write_batch(batch_df: DataFrame, batch_id: int) -> None:
+        if batch_df.isEmpty():
+            return
+
+        batch_df.write.format("jdbc").mode("append").option("url", jdbc_url).option(
+            "dbtable", pg_table
+        ).option("user", pg_user).option("password", pg_password).option(
+            "driver", "org.postgresql.Driver"
+        ).save()
+        print(f"batch {batch_id} written to {pg_table}")
+
+    return _write_batch
 
 
 def main() -> None:
@@ -131,11 +180,17 @@ def main() -> None:
 
     stream_df = read_weather_stream(spark=spark, input_path=args.input_path)
     transformed_stream_df = transform_weather_stream(stream_df)
+    jdbc_url = f"jdbc:postgresql://{args.pg_host}:{args.pg_port}/{args.pg_db}"
+    batch_writer = build_postgres_batch_writer(
+        jdbc_url=jdbc_url,
+        pg_table=args.pg_table,
+        pg_user=args.pg_user,
+        pg_password=args.pg_password,
+    )
 
     writer = (
-        transformed_stream_df.writeStream.format("console")
+        transformed_stream_df.writeStream.foreachBatch(batch_writer)
         .outputMode("append")
-        .option("truncate", False)
         .option("checkpointLocation", args.checkpoint_path)
     )
     if args.trigger_once:
