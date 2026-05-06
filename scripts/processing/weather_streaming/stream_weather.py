@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from typing import Callable
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, dayofweek, from_unixtime, hour, lower, to_timestamp, when
 from pyspark.sql.types import ArrayType, DoubleType, StringType, StructField, StructType
+
+LOGGER = logging.getLogger(__name__)
 
 
 def build_schema() -> StructType:
@@ -157,11 +160,25 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_args(args: argparse.Namespace) -> None:
+    if args.pg_port <= 0:
+        raise ValueError("--pg-port must be > 0")
+    if not args.pg_password:
+        raise ValueError("--pg-password (or POSTGRES_PASSWORD) is required")
+    if not args.pg_user:
+        raise ValueError("--pg-user (or POSTGRES_USER) is required")
+    if not args.pg_db:
+        raise ValueError("--pg-db (or POSTGRES_DB) is required")
+    if not args.pg_table:
+        raise ValueError("--pg-table (or WEATHER_PG_TABLE) is required")
+
+
 def build_postgres_batch_writer(
     jdbc_url: str, pg_table: str, pg_user: str, pg_password: str
 ) -> Callable[[DataFrame, int], None]:
     def _write_batch(batch_df: DataFrame, batch_id: int) -> None:
         if batch_df.isEmpty():
+            LOGGER.info("batch_id=%s skipped (empty batch)", batch_id)
             return
 
         batch_df.write.format("jdbc").mode("append").option("url", jdbc_url).option(
@@ -169,36 +186,55 @@ def build_postgres_batch_writer(
         ).option("user", pg_user).option("password", pg_password).option(
             "driver", "org.postgresql.Driver"
         ).save()
-        print(f"batch {batch_id} written to {pg_table}")
+        LOGGER.info("batch_id=%s written to table=%s", batch_id, pg_table)
 
     return _write_batch
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    )
     args = parse_args()
+    validate_args(args)
     spark = SparkSession.builder.appName("weather_streaming_read").getOrCreate()
+    try:
+        LOGGER.info(
+            "starting weather stream input=%s checkpoint=%s pg_host=%s pg_db=%s pg_table=%s trigger_once=%s",
+            args.input_path,
+            args.checkpoint_path,
+            args.pg_host,
+            args.pg_db,
+            args.pg_table,
+            args.trigger_once,
+        )
+        stream_df = read_weather_stream(spark=spark, input_path=args.input_path)
+        transformed_stream_df = transform_weather_stream(stream_df)
+        jdbc_url = f"jdbc:postgresql://{args.pg_host}:{args.pg_port}/{args.pg_db}"
+        batch_writer = build_postgres_batch_writer(
+            jdbc_url=jdbc_url,
+            pg_table=args.pg_table,
+            pg_user=args.pg_user,
+            pg_password=args.pg_password,
+        )
 
-    stream_df = read_weather_stream(spark=spark, input_path=args.input_path)
-    transformed_stream_df = transform_weather_stream(stream_df)
-    jdbc_url = f"jdbc:postgresql://{args.pg_host}:{args.pg_port}/{args.pg_db}"
-    batch_writer = build_postgres_batch_writer(
-        jdbc_url=jdbc_url,
-        pg_table=args.pg_table,
-        pg_user=args.pg_user,
-        pg_password=args.pg_password,
-    )
+        writer = (
+            transformed_stream_df.writeStream.foreachBatch(batch_writer)
+            .outputMode("append")
+            .option("checkpointLocation", args.checkpoint_path)
+        )
+        if args.trigger_once:
+            writer = writer.trigger(once=True)
 
-    writer = (
-        transformed_stream_df.writeStream.foreachBatch(batch_writer)
-        .outputMode("append")
-        .option("checkpointLocation", args.checkpoint_path)
-    )
-    if args.trigger_once:
-        writer = writer.trigger(once=True)
-
-    query = writer.start()
-    query.awaitTermination()
-    spark.stop()
+        query = writer.start()
+        query.awaitTermination()
+        LOGGER.info("weather stream terminated cleanly")
+    except Exception as exc:
+        LOGGER.exception("weather streaming job failed: %s", exc)
+        raise
+    finally:
+        spark.stop()
 
 
 if __name__ == "__main__":
