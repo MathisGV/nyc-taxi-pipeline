@@ -12,7 +12,7 @@ default_args = {
 
 with DAG(
     dag_id="dag_weather_streaming",
-    description="Orchestrate weather ingestion and streaming transform",
+    description="Ingestion et transformation meteo vers PostgreSQL",
     default_args=default_args,
     start_date=datetime(2025, 1, 1),
     schedule="0 * * * *",
@@ -23,17 +23,20 @@ with DAG(
     ingest_weather = BashOperator(
         task_id="ingest_weather_snapshot",
         bash_command=(
-            "PYTHONPATH=/opt/airflow "
-            "python -m scripts.ingestion.weather.fetch_weather --once"
+            "python /opt/airflow/scripts/ingestion/ingest_weather.py --once"
         ),
     )
 
     stream_weather = BashOperator(
-        task_id="run_weather_streaming_job",
+        task_id="transform_weather",
         bash_command=(
-            "PYTHONPATH=/opt/airflow "
-            "python -m scripts.processing.weather_streaming.stream_weather "
-            "--trigger-once"
+            "spark-submit "
+            "--conf spark.jars.ivy=/tmp/.ivy2 "
+            "--packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.7.4 "
+            "--master spark://spark-master:7077 "
+            "/opt/airflow/scripts/processing/transform_weather.py "
+            "--date {{ execution_date.strftime('%Y-%m-%d') }} "
+            "--hour {{ execution_date.hour }}"
         ),
     )
 

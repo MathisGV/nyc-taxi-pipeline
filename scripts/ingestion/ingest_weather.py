@@ -21,22 +21,44 @@ OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 MINIO_BUCKET = "weather-raw"
 LOCAL_TMP_DIR = Path("/tmp/weather")
 
-NYC_COORDS = {
-    "lat": 40.7128,
-    "lon": -74.0060
-}
 
-
-def fetch_weather(api_key: str) -> dict:
+def fetch_weather(
+    api_key: str,
+    city: str = "New York",
+    units: str = "metric",
+    timeout_seconds: int = 30,
+    max_retries: int = 3,
+    retry_delay_seconds: int = 2,
+) -> dict:
     params = {
-        "lat": NYC_COORDS["lat"],
-        "lon": NYC_COORDS["lon"],
+        "q": city,
         "appid": api_key,
-        "units": "metric"
+        "units": units,
     }
-    response = requests.get(OPENWEATHER_BASE_URL, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json()
+    last_error: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(
+                OPENWEATHER_BASE_URL, params=params, timeout=timeout_seconds
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Weather payload is not a valid JSON object")
+            return payload
+        except (requests.RequestException, ValueError) as e:
+            last_error = e
+            logger.warning(
+                "Weather API attempt %s/%s failed: %s",
+                attempt,
+                max_retries,
+                e,
+            )
+            if attempt < max_retries:
+                time.sleep(retry_delay_seconds)
+    raise RuntimeError(
+        f"Weather API request failed after {max_retries} attempts"
+    ) from last_error
 
 
 def save_locally(data: dict, timestamp: datetime) -> Path:
@@ -63,12 +85,13 @@ def upload_to_minio(client, local_path: Path, timestamp: datetime) -> str:
     return object_path
 
 
-def collect_once(api_key: str, client) -> None:
+def collect_once(api_key: str, client, city: str, units: str) -> None:
     timestamp = datetime.now(timezone.utc)
 
     try:
-        data = fetch_weather(api_key)
+        data = fetch_weather(api_key=api_key, city=city, units=units)
         data["_ingested_at"] = timestamp.isoformat()
+        data["_city"] = city
         local_path = save_locally(data, timestamp)
         upload_to_minio(client, local_path, timestamp)
         local_path.unlink()
@@ -83,7 +106,13 @@ def collect_once(api_key: str, client) -> None:
         raise
 
 
-def run_loop(api_key: str, interval_seconds: int, max_iterations: int | None) -> None:
+def run_loop(
+    api_key: str,
+    interval_seconds: int,
+    max_iterations: int | None,
+    city: str,
+    units: str,
+) -> None:
     client = get_minio_client()
     ensure_bucket(client, MINIO_BUCKET)
     LOCAL_TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -93,7 +122,7 @@ def run_loop(api_key: str, interval_seconds: int, max_iterations: int | None) ->
         logger.info(f"Collecting weather data (iteration {iterations + 1})")
 
         try:
-            collect_once(api_key, client)
+            collect_once(api_key, client, city, units)
         except Exception:
             logger.warning("Collection failed, retrying next cycle")
 
@@ -111,6 +140,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--interval", type=int, default=3600)
     parser.add_argument("--max-iterations", type=int, default=None)
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--city", type=str, default=os.getenv("OPENWEATHER_CITY", "New York"))
+    parser.add_argument("--units", type=str, default=os.getenv("OPENWEATHER_UNITS", "metric"))
     return parser.parse_args()
 
 
@@ -126,6 +157,6 @@ if __name__ == "__main__":
         client = get_minio_client()
         ensure_bucket(client, MINIO_BUCKET)
         LOCAL_TMP_DIR.mkdir(parents=True, exist_ok=True)
-        collect_once(api_key, client)
+        collect_once(api_key, client, args.city, args.units)
     else:
-        run_loop(api_key, args.interval, args.max_iterations)
+        run_loop(api_key, args.interval, args.max_iterations, args.city, args.units)
