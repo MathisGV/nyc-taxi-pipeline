@@ -1,0 +1,14 @@
+name: 'nyc_taxi_pipeline'
+version: '1.0.0'
+config-version: 2
+
+profile: 'nyc_taxi_pipeline'
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+models:
+  nyc_taxi_pipeline:
+    +materialized: table

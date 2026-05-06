@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: raw
+    database: airflow
+    schema: raw
+    tables:
+      - name: fact_taxi_trips
+        description: "Données brutes des trajets Yellow Taxi NYC transformées par Spark"
+        columns:
+          - name: tpep_pickup_datetime
+            description: "Heure de prise en charge"
+          - name: pickup_hour
+            description: "Heure de prise en charge (0-23)"
+          - name: trip_duration_minutes
+            description: "Durée du trajet en minutes"
+          - name: distance_bucket
+            description: "Tranche de distance (0-2km, 2-5km, >5km)"
+          - name: payment_label
+            description: "Type de paiement (carte, espèces, etc.)"
+          - name: tip_percentage
+            description: "Pourcentage de pourboire sur le montant de base"
+
+      - name: dim_weather
+        description: "Relevés météo horaires NYC via OpenWeatherMap"
+        columns:
+          - name: pickup_hour
+            description: "Heure du relevé (0-23)"
+          - name: temperature
+            description: "Température en °C"
+          - name: weather_category
+            description: "Catégorie météo (Clear, Rainy, Stormy)"
