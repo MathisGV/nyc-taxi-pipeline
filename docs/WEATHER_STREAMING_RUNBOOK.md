@@ -1,34 +1,37 @@
-# Weather Streaming Runbook
+# Runbook Weather Pipeline
 
 ## Objectif
 
-Valider rapidement le lot meteo (ingestion + streaming) avant une demo ou un merge.
+Valider rapidement le lot meteo (ingestion + transformation) avant une demo ou un merge. (Pour éviter la sempiternelle remarque du "ça marche chez moi")
 
-## Prerequis
+## Prérequis
 
 - Environnement Python avec `pyspark` installe.
 - Variables d'environnement chargees (`.env`).
-- PostgreSQL demarre et table `dim_weather` creee.
+- PostgreSQL demarre et table `raw.dim_weather` creee.
 
-## Etapes de verification
+## Etapes de vérification
 
-1. Verifier la configuration
-   - `python -m scripts.processing.weather_streaming.smoke_checks`
+1. Vérifier la configuration MinIO/PostgreSQL
+   - vérifier `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`
+   - vérifier `PGHOST`, `PGPORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 
 2. Lancer une collecte meteo unique
-   - `python -m scripts.ingestion.weather.fetch_weather --once`
+   - `python scripts/ingestion/ingest_weather.py --once`
 
-3. Lancer le streaming en traitement unique
-   - `python -m scripts.processing.weather_streaming.stream_weather --trigger-once`
+3. Lancer la transformation meteo pour une heure donnee
+   - `spark-submit scripts/processing/transform_weather.py --date 2026-05-06 --hour 10`
 
-4. Verifier les donnees en base
-   - `SELECT event_ts, city, weather_category, temperature_c FROM dim_weather ORDER BY weather_id DESC LIMIT 10;`
+4. Vérifier les donnees en base
+   - `SELECT recorded_at, temperature, weather_category, pickup_hour FROM raw.dim_weather ORDER BY weather_id DESC LIMIT 10;`
 
-## En cas d'erreur frequente
+## En cas d'erreur fréquente
 
 - `OPENWEATHER_API_KEY is required`:
-  - verifier la variable `OPENWEATHER_API_KEY`.
+  - vérifier la variable `OPENWEATHER_API_KEY`.
 - `No module named pyspark`:
   - installer `pyspark` dans l'environnement actif.
+- Erreur S3A/MinIO:
+  - vérifier `MINIO_S3_ENDPOINT` (Spark) et `MINIO_ENDPOINT` (scripts Python).
 - Erreur JDBC PostgreSQL:
-  - verifier `PGHOST`, `PGPORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
+  - vérifier `PGHOST`, `PGPORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
