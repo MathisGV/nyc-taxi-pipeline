@@ -4,7 +4,7 @@ import argparse
 import os
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, dayofweek, from_unixtime, hour, lower, to_timestamp, when
 from pyspark.sql.types import ArrayType, DoubleType, StringType, StructField, StructType
 
 
@@ -63,6 +63,44 @@ def read_weather_stream(spark: SparkSession, input_path: str) -> DataFrame:
     )
 
 
+def transform_weather_stream(raw_stream_df: DataFrame) -> DataFrame:
+    transformed_df = raw_stream_df.withColumn(
+        "event_ts", to_timestamp(from_unixtime(col("event_unix_ts")))
+    ).withColumn(
+        "weather_category",
+        when(lower(col("weather_main")) == "clear", "Clair")
+        .when(lower(col("weather_main")).isin("rain", "drizzle"), "Pluvieux")
+        .when(lower(col("weather_main")).isin("thunderstorm"), "Orageux")
+        .otherwise("Autre"),
+    ).withColumn(
+        "hour_of_day", hour(col("event_ts"))
+    ).withColumn(
+        "day_of_week", dayofweek(col("event_ts")) - 1
+    )
+
+    cleaned_df = transformed_df.filter(
+        col("event_ts").isNotNull()
+        & col("city").isNotNull()
+        & col("temperature_c").isNotNull()
+        & col("weather_main").isNotNull()
+    )
+
+    return cleaned_df.select(
+        col("event_ts"),
+        col("city"),
+        col("temperature_c"),
+        col("humidity_pct"),
+        col("wind_speed_ms"),
+        col("weather_main"),
+        col("weather_description"),
+        col("weather_category"),
+        col("hour_of_day"),
+        col("day_of_week"),
+        col("source"),
+        col("ingested_at"),
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Read weather JSON snapshots with Spark Structured Streaming."
@@ -92,9 +130,10 @@ def main() -> None:
     spark = SparkSession.builder.appName("weather_streaming_read").getOrCreate()
 
     stream_df = read_weather_stream(spark=spark, input_path=args.input_path)
+    transformed_stream_df = transform_weather_stream(stream_df)
 
     writer = (
-        stream_df.writeStream.format("console")
+        transformed_stream_df.writeStream.format("console")
         .outputMode("append")
         .option("truncate", False)
         .option("checkpointLocation", args.checkpoint_path)
