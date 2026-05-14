@@ -20,17 +20,19 @@ with taxi as (
     from {{ source('raw', 'fact_taxi_trips') }}
 ),
 
-weather as (
+weather_hourly as (
     select
         pickup_hour,
-        temperature,
-        feels_like,
-        humidity,
-        wind_speed,
-        weather_main,
-        weather_description,
-        weather_category
+        day_of_week,
+        avg(temperature)      as temperature,
+        avg(feels_like)       as feels_like,
+        avg(humidity)         as humidity,
+        avg(wind_speed)       as wind_speed,
+        max(weather_main)        as weather_main,
+        max(weather_description) as weather_description,
+        max(weather_category)    as weather_category
     from {{ source('raw', 'dim_weather') }}
+    group by pickup_hour, day_of_week
 ),
 
 enriched as (
@@ -58,8 +60,9 @@ enriched as (
         w.weather_description,
         w.weather_category
     from taxi t
-    left join weather w
-        on t.pickup_hour = w.pickup_hour
+    left join weather_hourly w
+        on  t.pickup_hour        = w.pickup_hour
+        and t.pickup_day_of_week = w.day_of_week
 )
 
 select * from enriched
