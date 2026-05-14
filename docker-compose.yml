@@ -13,11 +13,14 @@ x-airflow-common:
     OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+    _PIP_ADDITIONAL_REQUIREMENTS: "minio==7.2.9"
   volumes:
     - ./dags:/opt/airflow/dags
     - ./scripts:/opt/airflow/scripts
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
+    - ./requirements.txt:/requirements.txt
   depends_on:
     postgres:
       condition: service_healthy
@@ -101,7 +104,7 @@ services:
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow-webserver
-    command: webserver
+    command: bash -c "pip install -r /requirements.txt && airflow webserver"
     ports:
       - "8081:8080"
     restart: always
@@ -109,7 +112,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow-scheduler
-    command: scheduler
+    command: bash -c "pip install -r /requirements.txt && airflow scheduler"
     restart: always
 
   airflow-init:
