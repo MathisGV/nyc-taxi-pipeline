@@ -42,3 +42,5 @@ with DAG(
             "--month {{ execution_date.month }}"
         ),
     )
+
+    ingest >> transform
