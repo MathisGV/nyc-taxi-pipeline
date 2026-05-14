@@ -29,7 +29,7 @@ def build_spark_session() -> SparkSession:
             ),
         )
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_S3_ENDPOINT", "http://minio:9000"))
+        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ROOT_USER"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_ROOT_PASSWORD"))
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
@@ -100,10 +100,10 @@ def transform_weather(df: DataFrame) -> DataFrame:
         .withColumn("weather_description", col("weather")[0]["description"])
         .withColumn(
             "weather_category",
-            when(lower(col("weather")[0]["main"]) == "clear", lit("Clair"))
-            .when(lower(col("weather")[0]["main"]).isin("rain", "drizzle"), lit("Pluvieux"))
-            .when(lower(col("weather")[0]["main"]).isin("thunderstorm"), lit("Orageux"))
-            .otherwise(lit("Autre")),
+            when(lower(col("weather")[0]["main"]) == "clear", lit("Clear"))
+            .when(lower(col("weather")[0]["main"]).isin("rain", "drizzle"), lit("Rainy"))
+            .when(lower(col("weather")[0]["main"]).isin("thunderstorm", "snow"), lit("Stormy"))
+            .otherwise(lit("Other")),
         )
         .withColumn("pickup_hour", hour(col("recorded_at")))
         .withColumn("day_of_week", dayofweek(col("recorded_at")) - 1)
