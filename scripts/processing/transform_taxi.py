@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from common import get_logger
 
+
 load_dotenv()
 
 logger = get_logger(__name__)
@@ -51,6 +52,9 @@ def transform(df):
         *[item for pair in [(F.lit(k), F.lit(v)) for k, v in PAYMENT_TYPE_MAP.items()] for item in pair]
     )
 
+    if "cbd_congestion_fee" not in df.columns:
+        df = df.withColumn("cbd_congestion_fee", F.lit(0.0))
+
     return (
         df
         .withColumnRenamed("VendorID", "vendor_id")
@@ -88,6 +92,7 @@ def transform(df):
         .withColumn("pickup_hour", F.hour("tpep_pickup_datetime"))
         .withColumn("pickup_day_of_week", F.dayofweek("tpep_pickup_datetime"))
         .withColumn("ingested_at", F.current_timestamp())
+        
         .select(
             "vendor_id", "tpep_pickup_datetime", "tpep_dropoff_datetime",
             "passenger_count", "trip_distance", "rate_code_id", "store_and_fwd_flag",

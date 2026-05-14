@@ -63,11 +63,13 @@ services:
   spark-master:
     image: apache/spark:3.5.3
     container_name: spark-master
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port 7077
+      --webui-port 8080
     environment:
       - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     ports:
@@ -79,16 +81,20 @@ services:
   spark-worker:
     image: apache/spark:3.5.3
     container_name: spark-worker
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      --webui-port 8081
+      spark://spark-master:7077
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=${SPARK_WORKER_MEMORY}
       - SPARK_WORKER_CORES=${SPARK_WORKER_CORES}
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
     depends_on:
       - spark-master
+    ports:
+      - "8082:8081"
     volumes:
       - ./scripts:/opt/spark/scripts
 

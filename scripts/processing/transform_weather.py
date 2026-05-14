@@ -63,7 +63,7 @@ def read_weather_batch(spark: SparkSession, date_value: str, hour_value: int) ->
         ingested_at_alt_col,
         dt_col,
     )
-    return df.withColumn("_event_ts", event_ts).filter(hour(col("_event_ts")) == hour_value)
+    return df.withColumn("_event_ts", event_ts)
 
 
 def transform_weather(df: DataFrame) -> DataFrame:
@@ -130,7 +130,7 @@ def transform_weather(df: DataFrame) -> DataFrame:
 def write_to_postgres(df: DataFrame) -> None:
     df.write.format("jdbc").mode("append").option(
         "url",
-        f"jdbc:postgresql://{os.getenv('PGHOST', 'postgres')}:{os.getenv('PGPORT', '5432')}/{os.getenv('POSTGRES_DB')}",
+        f"jdbc:postgresql://{os.getenv('POSTGRES_HOST', os.getenv('PGHOST', 'postgres'))}:{os.getenv('PGPORT', '5432')}/{os.getenv('POSTGRES_DB')}",
     ).option("dbtable", "raw.dim_weather").option("user", os.getenv("POSTGRES_USER")).option(
         "password", os.getenv("POSTGRES_PASSWORD")
     ).option("driver", "org.postgresql.Driver").save()
