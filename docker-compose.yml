@@ -104,7 +104,7 @@ services:
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow-webserver
-    command: bash -c "pip install -r /requirements.txt && airflow webserver"
+    command: airflow webserver
     ports:
       - "8081:8080"
     restart: always
@@ -112,7 +112,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow-scheduler
-    command: bash -c "pip install -r /requirements.txt && airflow scheduler"
+    command: airflow scheduler
     restart: always
 
   airflow-init:
