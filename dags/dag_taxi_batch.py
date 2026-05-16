@@ -35,9 +35,9 @@ with DAG(
     transform = BashOperator(
         task_id="transform_taxi",
         bash_command=(
-            "spark-submit "
+            "docker exec spark-master /opt/spark/bin/spark-submit "
             "--master spark://spark-master:7077 "
-            "/opt/airflow/scripts/processing/transform_taxi.py "
+            "/opt/spark/scripts/processing/transform_taxi.py "
             "--year {{ execution_date.year }} "
             "--month {{ execution_date.month }}"
         ),
