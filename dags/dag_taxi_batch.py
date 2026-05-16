@@ -16,7 +16,7 @@ with DAG(
     default_args=default_args,
     start_date=datetime(2025, 1, 1),
     schedule_interval="0 0 1 * *",
-    catchup=True,
+    catchup=False,
     max_active_runs=1,
     tags=["taxi", "batch", "ingestion"],
 ) as dag:
@@ -25,10 +25,10 @@ with DAG(
         task_id="ingest_taxi",
         bash_command=(
             "python /opt/airflow/scripts/ingestion/ingest_taxi.py "
-            "--start-year {{ execution_date.year }} "
-            "--start-month {{ execution_date.month }} "
-            "--end-year {{ execution_date.year }} "
-            "--end-month {{ execution_date.month }}"
+            "--start-year 2025 "
+            "--start-month 1 "
+            "--end-year 2025 "
+            "--end-month 1"
         ),
     )
 
@@ -36,10 +36,13 @@ with DAG(
         task_id="transform_taxi",
         bash_command=(
             "docker exec spark-master /opt/spark/bin/spark-submit "
-            "--master spark://spark-master:7077 "
+            "--packages org.apache.hadoop:hadoop-aws:3.3.4,"
+            "com.amazonaws:aws-java-sdk-bundle:1.12.262,"
+            "org.postgresql:postgresql:42.6.0 "
+            "--master local[*] "
             "/opt/spark/scripts/processing/transform_taxi.py "
-            "--year {{ execution_date.year }} "
-            "--month {{ execution_date.month }}"
+            "--year 2025 "
+            "--month 1"
         ),
     )
 

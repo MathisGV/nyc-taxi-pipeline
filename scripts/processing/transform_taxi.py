@@ -32,7 +32,7 @@ def get_spark_session() -> SparkSession:
         SparkSession.builder
         .appName("transform_taxi")
         .config("spark.jars.packages", "org.postgresql:postgresql:42.6.0")
-        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
+        .config("spark.hadoop.fs.s3a.endpoint", os.getenv("MINIO_SPARK_ENDPOINT", "http://minio:9000"))
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ROOT_USER"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_ROOT_PASSWORD"))
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
