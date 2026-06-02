@@ -36,6 +36,7 @@ with DAG(
         task_id="transform_taxi",
         bash_command=(
             "docker exec spark-master /opt/spark/bin/spark-submit "
+            "--conf spark.jars.ivy=/tmp/.ivy2 "
             "--packages org.apache.hadoop:hadoop-aws:3.3.4,"
             "com.amazonaws:aws-java-sdk-bundle:1.12.262,"
             "org.postgresql:postgresql:42.6.0 "
