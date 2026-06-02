@@ -30,11 +30,13 @@ with DAG(
     stream_weather = BashOperator(
         task_id="transform_weather",
         bash_command=(
-            "spark-submit "
+            "docker exec spark-master /opt/spark/bin/spark-submit "
             "--conf spark.jars.ivy=/tmp/.ivy2 "
-            "--packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.7.4 "
-            "--master spark://spark-master:7077 "
-            "/opt/airflow/scripts/processing/transform_weather.py "
+            "--packages org.apache.hadoop:hadoop-aws:3.3.4,"
+            "com.amazonaws:aws-java-sdk-bundle:1.12.262,"
+            "org.postgresql:postgresql:42.7.4 "
+            "--master local[*] "
+            "/opt/spark/scripts/processing/transform_weather.py "
             "--date {{ execution_date.strftime('%Y-%m-%d') }} "
             "--hour {{ execution_date.hour }}"
         ),
